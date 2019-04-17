@@ -33,7 +33,7 @@
 #define HAVE_BOOL 1
 
 #include <mysql.h>
-#include <my_global.h>
+//#include <my_global.h>
 
 
 bool showDebug= false;
@@ -65,11 +65,12 @@ int main(int argc, char* argv[])
 
 
     int exitCode = 0;
-    args::ArgumentParser parser("Ocrs reconize barcodes live from camera.", "");
+    args::ArgumentParser parser("Find all Barcodes.", "");
     args::HelpFlag help(parser, "help", "Display this help menu", { "help"});
     args::ValueFlag<std::string> filename_param(parser, "filename", "The machine ID", {'f',"filename"});
     args::Flag debug(parser, "debug", "Show debug messages", {'d', "debug"});
     args::Flag window(parser, "window", "Show debug windows", {'w', "window"});
+    args::Flag debugtime(parser, "debugtime", "Show times", {'t', "debugtime"});
 
     args::ValueFlag<std::string> resultpath(parser, "resultpath", "resultpath", {'r',"resultpath"});
 
@@ -100,6 +101,9 @@ int main(int argc, char* argv[])
 
 
     FindCodes *fc = new FindCodes();
+    if (debugtime==1){
+        fc->setDebugTiming(true);
+    }
     fc->detect(args::get(filename_param));
     if (showDebug){
         fc->debugCodes();

@@ -34,15 +34,21 @@ public:
   std::list<Barcode*> codes();
 
   void detectByAdaptiveThreshold(cv::Mat useimage,int blocksize, int subtractmean);
+  void findCodeInImage(cv::Mat gray);
+  void findBlured(cv::Mat gray);
+  void detectByThreshold(cv::Mat image,int thres);
+  void setDebugTiming(bool v);
 
 private:
   bool hasCode(std::string code, std::string type);
+  void debugTime(std::string str);
 
   int startSubtractMean;
   int stepSubtractMean;
 
   int startBlocksize;
   int stepBlocksize;
+  bool debugtime;
 
 
 
@@ -52,6 +58,8 @@ private:
   std::list<Barcode*> barcodes;
   std::hash<std::string > hash;
 
-
+double debug_start_time;
+double debug_last_time;
+double debug_window_offset;
 };
 #endif

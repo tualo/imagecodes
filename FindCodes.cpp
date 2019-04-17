@@ -11,13 +11,32 @@ FindCodes::FindCodes():
   stepSubtractMean(5),
   
   startBlocksize(45),
-  stepBlocksize(10)
+  stepBlocksize(10),
+  debugtime(false)
 {
   maxTasks = boost::thread::hardware_concurrency();
+
+
+
+ debug_start_time = (double)cv::getTickCount();
+ debug_last_time = (double)cv::getTickCount();
+ debug_window_offset = 0;
+
 }
 
 FindCodes::~FindCodes() {
 
+}
+
+void FindCodes::debugTime(std::string str){
+    mutex.lock();
+    if (debugtime){
+        double time_since_start = ((double)cv::getTickCount() - debug_start_time)/cv::getTickFrequency();
+        double time_since_last = ((double)cv::getTickCount() - debug_last_time)/cv::getTickFrequency();
+        std::cout << str << ": " << time_since_last << "s " << "(total: " << time_since_start  << "s)" << std::endl;
+    }
+    debug_last_time = (double)cv::getTickCount();
+    mutex.unlock();
 }
 
 void FindCodes::detect(std::string filename){
@@ -32,17 +51,31 @@ void FindCodes::detect(std::string filename){
 
     detectCodes(useimage);
 
-    int i_bc_thres_stop=85;
-    int i_bc_thres_start=5;
-    int i_bc_thres_step = 10;
-
-    int subtractMean = 45;
-    int blockSize = 55;
 }
 
+void FindCodes::setDebugTiming(bool v){
+    debugtime=v;
+}
 
 void FindCodes::detectCodes(cv::Mat image){
     std::list<boost::thread*> threadList;
+
+debugTime("start detectCodes");
+
+    boost::thread* meanLoopThread = new boost::thread(&FindCodes::findBlured, this, image);  
+    threadList.push_back(meanLoopThread);
+
+
+
+    int i_bc_thres_stop=10;
+    int i_bc_thres_start=200;
+    int i_bc_thres_step=20;
+
+    for (int thres=i_bc_thres_stop;(thres>=i_bc_thres_start);thres-=i_bc_thres_step){
+        boost::thread* meanLoopThread = new boost::thread(&FindCodes::detectByThreshold, this, image, thres);  
+        threadList.push_back(meanLoopThread);
+    }
+
     for (int bs=startBlocksize;((bs>=0));bs-=stepBlocksize){
         for (int sm=startSubtractMean;((sm>=0));sm-=stepSubtractMean){
             boost::thread* meanLoopThread = new boost::thread(&FindCodes::detectByAdaptiveThreshold, this, image, bs, sm);  
@@ -50,11 +83,13 @@ void FindCodes::detectCodes(cv::Mat image){
         }
     }
     
+    
     std::list<boost::thread*>::const_iterator it;
     for (it = threadList.begin(); it != threadList.end(); ++it){
         ((boost::thread*)*it)->join();
     }
 
+    debugTime("stop detectCodes");
     //debugCodes();
 }
 void FindCodes::debugCodes(){
@@ -86,6 +121,16 @@ std::list<Barcode*> FindCodes::codes(){
 }
 
 
+
+void FindCodes::detectByThreshold(cv::Mat image,int thres) {
+    cv::Mat gray;
+    mutex.lock();
+    cv::Mat useimage = image.clone();
+    mutex.unlock();
+    cv::threshold(useimage,gray,thres,255, CV_THRESH_BINARY );
+    findCodeInImage(gray);
+}
+
 void FindCodes::detectByAdaptiveThreshold(cv::Mat image,int blocksize, int subtractmean) {
         /*
         mutex.lock();
@@ -106,6 +151,20 @@ void FindCodes::detectByAdaptiveThreshold(cv::Mat image,int blocksize, int subtr
             blocksize,
             subtractmean
         );
+        findCodeInImage(gray);
+}
+
+void FindCodes::findBlured(cv::Mat image){
+    cv::Mat gray;
+    mutex.lock();
+    cv::Mat useimage = image.clone();
+    mutex.unlock();
+    cv::GaussianBlur(useimage,gray,cv::Size(3,3),2,2);
+    findCodeInImage(gray);
+}
+
+void FindCodes::findCodeInImage(cv::Mat gray) {
+
         zbar::Image* _image;
         zbar::ImageScanner* _imageScanner;
 
